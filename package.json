@@ -1,0 +1,91 @@
+{
+  "name": "@kellanjs/use-resizable",
+  "version": "0.1.0",
+  "description": "Headless React hooks for resizable UI: sidebars, drawers, floating windows, split panes, IDE layouts and grids.",
+  "keywords": [
+    "react",
+    "hooks",
+    "headless",
+    "resizable",
+    "resize",
+    "split",
+    "split-pane",
+    "panes",
+    "panels",
+    "layout",
+    "sidebar",
+    "drawer",
+    "drag",
+    "grid",
+    "typescript"
+  ],
+  "author": "kellanjs",
+  "license": "MIT",
+  "homepage": "https://github.com/kellanjs/use-resizable",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kellanjs/use-resizable.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kellanjs/use-resizable/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "prebuild": "npm run clean",
+    "build": "tsc",
+    "lint": "eslint .",
+    "type": "tsc --noEmit",
+    "type:test": "tsc --noEmit -p tsconfig.test.json",
+    "prepack": "npm run build",
+    "pretest": "npm run build",
+    "test": "vitest run",
+    "test:react18": "node scripts/react18.mjs",
+    "fuzz": "node scripts/fuzz.mjs",
+    "format": "prettier --write .",
+    "check-format": "prettier --check .",
+    "check-exports": "attw --pack . --ignore-rules cjs-resolves-to-esm",
+    "ci": "npm run lint && npm run type && npm run build && npm run type:test && npm run check-format && npm run check-exports && npm run test && npm run test:react18"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@eslint/js": "^10.0.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.2",
+    "@types/node": "^26.6.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "jsdom": "^30.1.1",
+    "prettier": "^3.9.9",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}
