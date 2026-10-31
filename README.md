@@ -72,6 +72,7 @@ The examples style with Tailwind classes; any CSS works the same way.
 - [Performance](#performance)
 - [Recipes](#recipes)
   - [Sidebar with an icon rail](#sidebar-with-an-icon-rail)
+  - [Workspace panel with a rail](#workspace-panel-with-a-rail)
   - [IDE layout](#ide-layout)
   - [App shell that closes panes in order](#app-shell-that-closes-panes-in-order)
   - [Grid dashboard](#grid-dashboard)
@@ -607,7 +608,9 @@ and `toggle("closed")` are the buttons. Show the rail's content by
 `width.contentStop`, not `width.stop` (which changes as a change begins, so the
 open content would vanish as the closing starts): see [Deciding what to
 show](#deciding-what-to-show). [Sidebar with an icon
-rail](#sidebar-with-an-icon-rail) is the complete recipe.
+rail](#sidebar-with-an-icon-rail) is the complete recipe for a few links. For a
+heavy panel (an inspector, an editor, a long list), [Workspace panel with a
+rail](#workspace-panel-with-a-rail) keeps it mounted and crossfades it instead.
 
 **A stop, or a range's minimum?** Make the rail a stop when it's a state of its
 own: sizes between it and the open range aren't places to rest (a drag there
@@ -1927,6 +1930,16 @@ isn't reached on the way past by a pane closing from wider.
 With `reflow: "once"`, `contentStop` and `contentSize` also wait through a drag
 (see [Reflowing once](#reflowing-once)).
 
+**Swap light content; hide heavy content.** Content chosen by `contentStop` is
+mounted as the change begins, in the same task that starts its transition, and
+the transition doesn't wait for it: its clock starts at once, so a slow mount is
+time taken from the animation. A panel that takes 150ms to build leaves a 400ms
+opening most of the way open by its first painted frame, so it jumps rather than
+slides. A label or a few icons cost nothing to swap. For a whole panel, keep
+both mounted and choose which one shows (`opacity` and `inert`), as in
+[Crossfading a rail](#crossfading-a-rail); it also keeps the panel's own state
+(its scroll, what's expanded) while it's at the rail.
+
 ### Crossfading a rail
 
 To swap the open content for a rail, stack both in a covering layer and
@@ -1987,7 +2000,12 @@ export function RailSidebar() {
 ```
 
 - Both layers are pinned to the anchored edge (`start-0`, with
-  `anchor: "start"`), so open and rail crossfade in place.
+  `anchor: "start"`; `end-0` with `anchor: "end"`), so open and rail crossfade
+  in place.
+- **It's also the fast way for heavy content.** Nothing is built as it opens,
+  and the open layer is laid out at its open size, so it doesn't reflow as the
+  element moves between the rail and the range. [Workspace panel with a
+  rail](#workspace-panel-with-a-rail) is the complete recipe.
 - Closing to 0 from the rail, `contentStop` stays `rail`, so the rail's layer
   leaves with the sidebar instead of swapping on the way out; coming out of
   `closed`, nothing was showing, so the layers swap without a fade (`fromStop`).
@@ -2680,6 +2698,17 @@ out at a fixed size behind a clip instead, so the element covers and uncovers it
 (see [Cover and slide](#cover-and-slide)), and content that does can [reflow
 once](#reflowing-once) per change.
 
+Two more costs show up as an animated change, rather than as a slow drag:
+
+- **Mounting on a change.** Content chosen by `contentStop` is built in the
+  frame its transition starts, and the transition doesn't wait, so a slow mount
+  eats into the animation. Keep heavy content mounted and hide it instead (see
+  [Deciding what to show](#deciding-what-to-show)).
+- **Layouts that switch by width.** Content that changes its own layout at some
+  width (with a `ResizeObserver`, or container queries), squeezed through that
+  width, switches in the middle of the animation, re-rendering or remounting
+  part of itself. Covered, or reflowing once, it stays at one width.
+
 Only what changed is restyled: a drag frame changes the style of each child
 whose size moves, and the ARIA values of the separators reporting those sizes,
 and nothing inside them. To follow every change without re-rendering at all,
@@ -2788,6 +2817,114 @@ export function SidebarWithRail() {
 - **The button inside stays focusable** in both states. To crossfade the open
   content and the rail's instead of swapping them, see [Crossfading a
   rail](#crossfading-a-rail).
+- **It's for light content.** The content is squeezed (it reflows on every
+  frame of a change) and its labels are added and removed by `contentStop`,
+  both cheap for a few links. A heavy panel would be built in the frame its
+  opening starts and laid out again on every frame after: keep it mounted and
+  crossfade it, as in [Workspace panel with a
+  rail](#workspace-panel-with-a-rail).
+
+### Workspace panel with a rail
+
+An inspector docked on the right: heavy content (hundreds of rows, editors,
+tooltips) that collapses to a 2.75rem rail of buttons and opens again without a
+stutter. Its width is saved.
+
+```tsx
+import { useResizable } from "@kellanjs/use-resizable";
+import { memo } from "react";
+
+const FADE =
+  "transition-opacity duration-(--resizable-duration) ease-(--resizable-easing)";
+
+// Slow to build and to lay out: built once, and never re-rendered by a drag.
+const Inspector = memo(function Inspector() {
+  return <div className="min-h-0 flex-1 overflow-auto">{/* many rows */}</div>;
+});
+
+export function WorkspaceWithInspector() {
+  const inspector = useResizable({
+    anchor: "end",
+    width: {
+      defaultSize: "28rem",
+      defaultStop: "open",
+      stops: {
+        rail: { size: "2.75rem", endsDrag: true },
+        open: { min: "18rem", max: ["48rem", "60%"] },
+      },
+    },
+    persist: { key: "inspector" },
+  });
+  const atRail = inspector.width.contentStop === "rail";
+
+  return (
+    <div className="flex h-screen">
+      <main className="min-w-0 flex-1 p-4">Canvas</main>
+      <aside
+        {...inspector.getElementProps()}
+        aria-label="Inspector"
+        className="relative bg-slate-50 shadow-[-1px_0_0_var(--color-slate-300)]"
+      >
+        <div {...inspector.getClipProps()}>
+          <div
+            inert={atRail}
+            className={`absolute inset-0 ${FADE} ${atRail ? "opacity-0" : ""}`}
+          >
+            <div
+              {...inspector.getContentProps()}
+              className="flex h-full flex-col"
+            >
+              <button
+                onClick={() => inspector.setStop("rail")}
+                className="h-10 shrink-0 px-3 text-start"
+              >
+                Collapse »
+              </button>
+              <Inspector />
+            </div>
+          </div>
+          <div
+            inert={!atRail}
+            className={`absolute inset-y-0 end-0 w-11 ${FADE} ${atRail ? "" : "opacity-0"}`}
+          >
+            <button
+              onClick={() => inspector.setStop("open")}
+              aria-label="Expand inspector"
+              className="h-10 w-full"
+            >
+              «
+            </button>
+          </div>
+        </div>
+        <div
+          {...inspector.getHandleProps("start")}
+          aria-label="Resize inspector"
+          className="handle"
+        />
+      </aside>
+    </div>
+  );
+}
+```
+
+- **Both layers stay mounted**, and `contentStop` only chooses which one shows
+  and which one is `inert`. Opening builds nothing, so the transition's first
+  frame isn't held up (see [Deciding what to show](#deciding-what-to-show)),
+  and the inspector keeps its scroll and what's expanded while at the rail.
+- **The inspector is laid out at its open size** (`getContentProps`, inside
+  `getClipProps`), so between the rail and the range the moving edge covers and
+  uncovers it rather than reflowing it on every frame. Content that switches
+  its own layout by width never sees the in-between widths.
+- **Dragging within its range, it still reflows** with the edge, as a range's
+  content does. If that's slow too, add `reflow: "once"` (see [Reflowing
+  once](#reflowing-once)).
+- **It's anchored at its end**, so the rail's layer is pinned there (`end-0`),
+  the clip layer pins the open content there too, and the handle is `start`.
+  The handle sits beside the clip layer, which would clip it. The divider is an
+  outer shadow on its left (see [Divider lines](#divider-lines)).
+- **`memo`** keeps a drag's per-frame re-renders out of the inspector (see
+  [Performance](#performance)). React 18 needs `inert` set as an attribute (see
+  [Crossfading a rail](#crossfading-a-rail)).
 
 ### IDE layout
 
